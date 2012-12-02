@@ -43,6 +43,7 @@ class DjrillBackend(BaseEmailBackend):
                 "url to your settings.py")
 
         self.api_action = self.api_url + "/messages/send.json"
+        self.api_template_action = self.api_url + "/messages/send-template.json"
 
     def send_messages(self, email_messages):
         if not email_messages:
@@ -57,6 +58,7 @@ class DjrillBackend(BaseEmailBackend):
         return num_sent
 
     def _send(self, message):
+        email_api_action = self.api_action
         if not message.recipients():
             return False
 
@@ -68,8 +70,9 @@ class DjrillBackend(BaseEmailBackend):
 
         self.msg_dict = self._build_standard_message_dict(message)
 
-        if getattr(message, "alternative_subtype", None):
-            if message.alternative_subtype == "mandrill":
+        alternative_subtype = getattr(message, "alternative_subtype", None)
+        if alternative_subtype:
+            if alternative_subtype.startswith("mandrill"):
                 self._build_advanced_message_dict(message)
         try:
             if getattr(message, 'alternatives', None):
@@ -78,11 +81,21 @@ class DjrillBackend(BaseEmailBackend):
             if not self.fail_silently:
                 raise
             return False
-
-        djrill_it = requests.post(self.api_action, data=json.dumps({
+        
+        api_data = {
             "key": self.api_key,
             "message": self.msg_dict
-        }))
+        }
+        if alternative_subtype == 'mandrill_template':
+            email_api_action = self.api_template_action
+            api_data.update({
+                'template_name': message.template_name,
+                'template_content': message.template_content,
+            })
+        
+        from pprint import pprint
+        pprint(api_data)
+        djrill_it = requests.post(email_api_action, data=json.dumps(api_data))
 
         if djrill_it.status_code != 200:
             if not self.fail_silently:
@@ -132,7 +145,8 @@ class DjrillBackend(BaseEmailBackend):
         })
         if message.from_name:
             self.msg_dict["from_name"] = message.from_name
-
+        if hasattr(message, 'merge_vars') and message.merge_vars:
+            self.msg_dict["merge_vars"] = message.merge_vars
 
     def _add_alternatives(self, message):
         """

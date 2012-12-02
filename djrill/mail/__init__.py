@@ -37,3 +37,24 @@ class DjrillMessage(EmailMultiAlternatives):
                     "internal use and will cause errors with Mandill's API")
 
         return tag_list
+
+class DjrillTemplateMessage(DjrillMessage):
+    alternative_subtype = "mandrill_template"
+    template_name = None
+    template_content = []
+    merge_vars = []
+    
+    def __init__(self, *args, **kwargs):
+        template_name = kwargs.pop('template_name', None)
+        if template_name:
+            self.template_name = template_name
+        template_content = kwargs.pop('template_content', None)
+        if template_content:
+            self.template_content = template_content
+        merge_vars = kwargs.pop('merge_vars', [])
+        if merge_vars:
+            self.merge_vars = merge_vars
+        assert self.template_name!=None
+        
+        super(DjrillTemplateMessage, self).__init__(*args, **kwargs)
+    
